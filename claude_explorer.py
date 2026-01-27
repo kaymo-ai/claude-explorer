@@ -261,7 +261,7 @@ def get_html_template():
         .card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 16px; cursor: pointer; transition: all 0.15s; }
         .card:hover { border-color: var(--accent); transform: translateY(-1px); }
         .card-title { font-weight: 500; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; font-size: 0.95rem; }
-        .card-meta { font-size: 0.75rem; color: var(--text-secondary); }
+        .card-meta { font-size: 0.75rem; color: var(--text-secondary); word-break: break-all; }
         .card-content { margin-top: 10px; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; }
         .session-list { display: flex; flex-direction: column; gap: 8px; }
         .session-item { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; cursor: pointer; transition: all 0.15s; }
