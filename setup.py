@@ -10,13 +10,13 @@ long_description = readme.read_text() if readme.exists() else ""
 
 setup(
     name="claude-explorer",
-    version="1.0.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    version="0.1.0",
+    author="Marcus Foster",
+    author_email="marcus@kaymo.ai",
     description="Interactive viewer for Claude Code session data",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/claude-explorer",
+    url="https://github.com/kaymo-ai/claude-explorer",
     license="MIT",
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -43,7 +43,7 @@ setup(
     },
     keywords="claude, anthropic, cli, history, explorer, dashboard",
     project_urls={
-        "Bug Reports": "https://github.com/yourusername/claude-explorer/issues",
-        "Source": "https://github.com/yourusername/claude-explorer",
+        "Bug Reports": "https://github.com/kaymo-ai/claude-explorer/issues",
+        "Source": "https://github.com/kaymo-ai/claude-explorer",
     },
 )

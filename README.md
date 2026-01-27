@@ -34,7 +34,7 @@ pip install claude-explorer
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/claude-explorer.git
+git clone https://github.com/kaymo-ai/claude-explorer.git
 cd claude-explorer
 
 # Make executable and add to PATH
@@ -46,7 +46,7 @@ sudo ln -s $(pwd)/claude-explorer /usr/local/bin/claude-explorer
 
 ```bash
 # Download and run directly
-curl -fsSL https://raw.githubusercontent.com/yourusername/claude-explorer/main/claude-explorer -o claude-explorer
+curl -fsSL https://raw.githubusercontent.com/kaymo-ai/claude-explorer/main/claude-explorer -o claude-explorer
 chmod +x claude-explorer
 ./claude-explorer
 ```
@@ -136,7 +136,7 @@ Claude Explorer reads the following from your `~/.claude` directory:
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/claude-explorer.git
+git clone https://github.com/kaymo-ai/claude-explorer.git
 cd claude-explorer
 
 # Run locally
