@@ -10,7 +10,7 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
-    {name = "Your Name", email = "marcus@kaymo.ai"}
+    {name = "Marcus Foster", email = "marcus@kaymo.ai"}
 ]
 keywords = ["claude", "anthropic", "cli", "history", "explorer", "dashboard"]
 classifiers = [
