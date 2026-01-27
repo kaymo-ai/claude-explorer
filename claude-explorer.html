@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Explorer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent: #c9885a;
+            --accent-hover: #d99a6c;
+            --success: #3fb950;
+            --warning: #d29922;
+            --danger: #f85149;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            padding: 20px 0;
+            flex-shrink: 0;
+        }
+
+        .logo {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .logo h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo span {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        .nav-section {
+            padding: 0 12px;
+            margin-bottom: 24px;
+        }
+
+        .nav-section-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            padding: 0 8px;
+            margin-bottom: 8px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.15s ease;
+            font-size: 0.9rem;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .nav-item svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        /* Main Content */
+        .main {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .page-header {
+            margin-bottom: 24px;
+        }
+
+        .page-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .page-header p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .stat-card .label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .stat-card .subtitle {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Charts */
+        .chart-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .chart-container h3 {
+            font-size: 1rem;
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+
+        .chart-wrapper {
+            height: 300px;
+        }
+
+        /* Table */
+        .table-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .table-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .table-header h3 {
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 20px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        td {
+            font-size: 0.9rem;
+        }
+
+        tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Cards */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .card:hover {
+            border-color: var(--accent);
+        }
+
+        .card-title {
+            font-weight: 500;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-meta {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        .badge-success { background: rgba(63, 185, 80, 0.2); color: var(--success); }
+        .badge-warning { background: rgba(210, 153, 34, 0.2); color: var(--warning); }
+        .badge-accent { background: rgba(201, 136, 90, 0.2); color: var(--accent); }
+
+        /* Code block */
+        .code-block {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            max-width: 800px;
+            max-height: 80vh;
+            width: 90%;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            max-height: calc(80vh - 70px);
+        }
+
+        /* Search */
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 16px;
+        }
+
+        .search-box input {
+            flex: 1;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        .search-box svg {
+            color: var(--text-secondary);
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Hour chart */
+        .hour-chart {
+            display: flex;
+            gap: 4px;
+            align-items: flex-end;
+            height: 100px;
+        }
+
+        .hour-bar {
+            flex: 1;
+            background: var(--accent);
+            border-radius: 2px 2px 0 0;
+            min-height: 4px;
+            transition: opacity 0.15s ease;
+        }
+
+        .hour-bar:hover {
+            opacity: 0.8;
+        }
+
+        /* Token display */
+        .token-display {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+        }
+
+        .token-display .input { color: #58a6ff; }
+        .token-display .output { color: #3fb950; }
+        .token-display .cache { color: #8b949e; }
+
+        /* List */
+        .list-item {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
+        }
+
+        .list-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .list-item-content h4 {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .list-item-content p {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* Markdown viewer */
+        .markdown-content {
+            line-height: 1.6;
+        }
+
+        .markdown-content h1 { font-size: 1.5rem; margin: 20px 0 12px; }
+        .markdown-content h2 { font-size: 1.25rem; margin: 18px 0 10px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+        .markdown-content h3 { font-size: 1.1rem; margin: 16px 0 8px; }
+        .markdown-content p { margin: 12px 0; }
+        .markdown-content code {
+            background: var(--bg-primary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+        .markdown-content pre {
+            background: var(--bg-primary);
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+        .markdown-content pre code {
+            padding: 0;
+            background: none;
+        }
+        .markdown-content ul, .markdown-content ol {
+            margin: 12px 0;
+            padding-left: 24px;
+        }
+        .markdown-content li {
+            margin: 6px 0;
+        }
+        .markdown-content table {
+            width: 100%;
+            margin: 16px 0;
+        }
+        .markdown-content blockquote {
+            border-left: 3px solid var(--accent);
+            padding-left: 16px;
+            margin: 12px 0;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="sidebar">
+            <div class="logo">
+                <h1>
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                    </svg>
+                    Claude Explorer
+                </h1>
+                <span>~/.claude Data Viewer</span>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Overview</div>
+                <div class="nav-item active" data-page="dashboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    Dashboard
+                </div>
+                <div class="nav-item" data-page="stats">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+                    Statistics
+                </div>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Data</div>
+                <div class="nav-item" data-page="history">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    History
+                </div>
+                <div class="nav-item" data-page="projects">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                    Projects
+                </div>
+                <div class="nav-item" data-page="plans">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    Plans
+                </div>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Configuration</div>
+                <div class="nav-item" data-page="settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                    Settings
+                </div>
+                <div class="nav-item" data-page="plugins">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                    Plugins
+                </div>
+                <div class="nav-item" data-page="skills">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    Skills
+                </div>
+            </div>
+        </nav>
+
+        <main class="main">
+            <!-- Dashboard Page -->
+            <div class="page active" id="dashboard">
+                <div class="page-header">
+                    <h2>Dashboard</h2>
+                    <p>Overview of your Claude Code usage</p>
+                </div>
+
+                <div class="stats-grid" id="dashboard-stats">
+                    <!-- Filled by JS -->
+                </div>
+
+                <div class="chart-container">
+                    <h3>Activity Over Time</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="activityChart"></canvas>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                    <div class="chart-container">
+                        <h3>Usage by Hour</h3>
+                        <div class="hour-chart" id="hourChart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Token Usage</h3>
+                        <div class="token-display" id="tokenUsage"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Page -->
+            <div class="page" id="stats">
+                <div class="page-header">
+                    <h2>Statistics</h2>
+                    <p>Detailed usage statistics and metrics</p>
+                </div>
+                <div class="stats-grid" id="detailed-stats"></div>
+                <div class="chart-container">
+                    <h3>Daily Token Usage</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="tokenChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Page -->
+            <div class="page" id="history">
+                <div class="page-header">
+                    <h2>History</h2>
+                    <p>Your conversation history (432 entries)</p>
+                </div>
+                <div class="search-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" placeholder="Search history..." id="historySearch">
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Message</th>
+                                <th>Project</th>
+                                <th>Session</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Projects Page -->
+            <div class="page" id="projects">
+                <div class="page-header">
+                    <h2>Projects</h2>
+                    <p>Claude Code project configurations</p>
+                </div>
+                <div class="card-grid" id="projectsGrid"></div>
+            </div>
+
+            <!-- Plans Page -->
+            <div class="page" id="plans">
+                <div class="page-header">
+                    <h2>Plans</h2>
+                    <p>Implementation plans created during sessions</p>
+                </div>
+                <div class="card-grid" id="plansGrid"></div>
+            </div>
+
+            <!-- Settings Page -->
+            <div class="page" id="settings">
+                <div class="page-header">
+                    <h2>Settings</h2>
+                    <p>Claude Code configuration</p>
+                </div>
+                <div class="chart-container">
+                    <h3>settings.json</h3>
+                    <div class="code-block" id="settingsJson"></div>
+                </div>
+                <div class="chart-container">
+                    <h3>settings.local.json</h3>
+                    <div class="code-block" id="settingsLocalJson"></div>
+                </div>
+            </div>
+
+            <!-- Plugins Page -->
+            <div class="page" id="plugins">
+                <div class="page-header">
+                    <h2>Plugins</h2>
+                    <p>Installed plugins and marketplaces</p>
+                </div>
+                <div class="table-container" id="pluginsContainer"></div>
+            </div>
+
+            <!-- Skills Page -->
+            <div class="page" id="skills">
+                <div class="page-header">
+                    <h2>Skills</h2>
+                    <p>Custom skills available in Claude Code</p>
+                </div>
+                <div class="card-grid" id="skillsGrid"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle">Details</h3>
+                <button class="modal-close" onclick="closeModal()">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        // Embedded data from ~/.claude
+        const data = {
+            stats: {
+                version: 1,
+                lastComputedDate: "2026-01-26",
+                dailyActivity: [
+                    { date: "2025-11-25", messageCount: 2, sessionCount: 1, toolCallCount: 0 },
+                    { date: "2026-01-02", messageCount: 888, sessionCount: 2, toolCallCount: 248 },
+                    { date: "2026-01-14", messageCount: 405, sessionCount: 2, toolCallCount: 150 },
+                    { date: "2026-01-18", messageCount: 328, sessionCount: 3, toolCallCount: 77 },
+                    { date: "2026-01-19", messageCount: 3911, sessionCount: 1, toolCallCount: 529 },
+                    { date: "2026-01-21", messageCount: 897, sessionCount: 1, toolCallCount: 79 },
+                    { date: "2026-01-23", messageCount: 1577, sessionCount: 3, toolCallCount: 267 },
+                    { date: "2026-01-24", messageCount: 10438, sessionCount: 6, toolCallCount: 1564 },
+                    { date: "2026-01-25", messageCount: 1525, sessionCount: 1, toolCallCount: 239 },
+                    { date: "2026-01-26", messageCount: 1082, sessionCount: 1, toolCallCount: 158 }
+                ],
+                dailyModelTokens: [
+                    { date: "2026-01-02", tokensByModel: { "claude-opus-4-5-20251101": 84868 } },
+                    { date: "2026-01-14", tokensByModel: { "claude-opus-4-5-20251101": 24419 } },
+                    { date: "2026-01-18", tokensByModel: { "claude-opus-4-5-20251101": 1826 } },
+                    { date: "2026-01-19", tokensByModel: { "claude-opus-4-5-20251101": 55452 } },
+                    { date: "2026-01-21", tokensByModel: { "claude-opus-4-5-20251101": 2592 } },
+                    { date: "2026-01-23", tokensByModel: { "claude-opus-4-5-20251101": 6996 } },
+                    { date: "2026-01-24", tokensByModel: { "claude-opus-4-5-20251101": 173269 } },
+                    { date: "2026-01-25", tokensByModel: { "claude-opus-4-5-20251101": 13334 } },
+                    { date: "2026-01-26", tokensByModel: { "claude-opus-4-5-20251101": 4023 } }
+                ],
+                modelUsage: {
+                    "claude-opus-4-5-20251101": {
+                        inputTokens: 254835,
+                        outputTokens: 111944,
+                        cacheReadInputTokens: 727828717,
+                        cacheCreationInputTokens: 69404503
+                    }
+                },
+                totalSessions: 21,
+                totalMessages: 21053,
+                longestSession: {
+                    sessionId: "931e30f6-d4c0-4fc2-a27b-998427e075c7",
+                    duration: 228381616,
+                    messageCount: 3247,
+                    timestamp: "2026-01-24T02:09:24.584Z"
+                },
+                firstSessionDate: "2025-11-25T01:41:10.835Z",
+                hourCounts: { 8: 2, 10: 1, 12: 3, 13: 2, 15: 1, 16: 3, 17: 4, 18: 1, 21: 4 }
+            },
+            settings: {
+                enabledPlugins: {
+                    "swift-lsp@claude-plugins-official": true
+                }
+            },
+            settingsLocal: {
+                permissions: {
+                    allow: [
+                        "Bash(ping:*)",
+                        "Bash(nslookup:*)",
+                        "Bash(curl:*)",
+                        "Bash(nc:*)",
+                        "Bash(networksetup -listallnetworkservices:*)",
+                        "Bash(scutil:*)",
+                        "Bash(security find-identity:*)",
+                        "Bash(security list-keychains:*)"
+                    ]
+                }
+            },
+            plugins: {
+                version: 2,
+                plugins: {
+                    "swift-lsp@claude-plugins-official": [{
+                        scope: "user",
+                        installPath: "/Users/marcus/.claude/plugins/cache/claude-plugins-official/swift-lsp/1.0.0",
+                        version: "1.0.0",
+                        installedAt: "2026-01-24T06:33:08.729Z",
+                        lastUpdated: "2026-01-24T06:33:08.729Z",
+                        gitCommitSha: "e30768372b4150ca1bc0839d93283e8edc30d60d"
+                    }]
+                }
+            },
+            marketplaces: {
+                "claude-plugins-official": {
+                    source: { source: "github", repo: "anthropics/claude-plugins-official" },
+                    installLocation: "/Users/marcus/.claude/plugins/marketplaces/claude-plugins-official",
+                    lastUpdated: "2026-01-27T07:34:02.775Z"
+                }
+            },
+            projects: [
+                { name: "Claude-Explorer", path: "-Users-marcus-Development-Claude-Explorer" },
+                { name: "HampshireAI", path: "-Users-marcus-Development-HampshireAI" },
+                { name: "kaymo-exp/bodymodel", path: "-Users-marcus-Development-Kaymo-Code-kaymo-exp-bodymodel" },
+                { name: "kaymo-monorepo", path: "-Users-marcus-Development-Kaymo-Code-kaymo-monorepo" },
+                { name: "kaymo-research", path: "-Users-marcus-Development-Kaymo-Code-kaymo-research" },
+                { name: "niivue-play", path: "-Users-marcus-Development-niivue-play" },
+                { name: "SnailsNative", path: "-Users-marcus-Development-Snails-SnailsNative" }
+            ],
+            plans: [
+                { name: "bubbly-seeking-storm", file: "bubbly-seeking-storm.md", size: "9.5 KB", modified: "Jan 22" },
+                { name: "lexical-whistling-torvalds", file: "lexical-whistling-torvalds.md", size: "6.3 KB", modified: "Jan 2" },
+                { name: "precious-beaming-tarjan", file: "precious-beaming-tarjan.md", size: "6.6 KB", modified: "Jan 26", content: `# EC2 Container Efficiency Plan: Convex-Based Job Batching
+
+## Problem Statement
+
+AWS Batch container startup time (~2-3 minutes for g4dn.8xlarge) is a significant overhead when processing single studies. Users upload studies sporadically, and each upload triggers a separate container launch, wasting resources on repeated cold starts.
+
+**Goal:** Run multiple segmentation jobs while a container is already running to amortize startup cost.
+
+---
+
+## Recommended Solution: Convex-Based Job Batching
+
+Queue segmentation requests in Convex, then submit a single AWS Batch job that processes multiple studies.
+
+### How It Works
+
+1. **Queue Phase:** When user triggers segmentation, add study to a pending queue in Convex
+2. **Batch Window:** Wait N seconds (configurable, e.g., 30-60s) to collect more studies
+3. **Submit:** Submit single Batch job with list of study IDs
+4. **Process:** Container starts once, processes all queued studies sequentially
+5. **Callback:** Each study sends individual webhook on completion` },
+                { name: "stateful-meandering-raccoon", file: "stateful-meandering-raccoon.md", size: "6.2 KB", modified: "Jan 26" }
+            ],
+            skills: [
+                { name: "kaymo-branding", path: "kaymo-branding", files: ["SKILL.md", "assets/", "references/"] }
+            ],
+            history: [
+                { display: "I believe the current approaches tried in this project were not very successful...", project: "kaymo-exp/bodymodel", sessionId: "f7b5d3b6-3690-4612-9710-40190dcdfb29", timestamp: 1767384838689 },
+                { display: "let's fix the homepage. It is not showing the system stats properly...", project: "HampshireAI", sessionId: "5202db83-38d8-40fe-a433-a46d5407ac3e", timestamp: 1768715411180 },
+                { display: "yes, please restyle", project: "HampshireAI", sessionId: "5202db83-38d8-40fe-a433-a46d5407ac3e", timestamp: 1768724644752 },
+                { display: "no, lets try to fix the bug where the scanviewer in staging fails...", project: "kaymo-monorepo", sessionId: "9354b0b4-f9c0-43ef-867a-8ea87b9da72e", timestamp: 1768853434989 },
+                { display: "ok, good. now another issue remains that when uploading a new prenuvo scan...", project: "kaymo-monorepo", sessionId: "9354b0b4-f9c0-43ef-867a-8ea87b9da72e", timestamp: 1768854226782 },
+                { display: "great, now can we combine this into one section...", project: "kaymo-monorepo", sessionId: "9354b0b4-f9c0-43ef-867a-8ea87b9da72e", timestamp: 1768871680163 },
+                { display: "great, now to improver overall navigation...", project: "kaymo-monorepo", sessionId: "9354b0b4-f9c0-43ef-867a-8ea87b9da72e", timestamp: 1768871994716 },
+                { display: "ok, great, let's start on fixing the next issues...", project: "kaymo-monorepo", sessionId: "9354b0b4-f9c0-43ef-867a-8ea87b9da72e", timestamp: 1768872596676 }
+            ]
+        };
+
+        // Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById(item.dataset.page).classList.add('active');
+            });
+        });
+
+        // Format numbers
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        }
+
+        // Format duration
+        function formatDuration(ms) {
+            const hours = Math.floor(ms / 3600000);
+            const minutes = Math.floor((ms % 3600000) / 60000);
+            return `${hours}h ${minutes}m`;
+        }
+
+        // Initialize Dashboard
+        function initDashboard() {
+            const stats = data.stats;
+            const usage = stats.modelUsage["claude-opus-4-5-20251101"];
+
+            document.getElementById('dashboard-stats').innerHTML = `
+                <div class="stat-card">
+                    <div class="label">Total Sessions</div>
+                    <div class="value">${stats.totalSessions}</div>
+                    <div class="subtitle">Since ${new Date(stats.firstSessionDate).toLocaleDateString()}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Total Messages</div>
+                    <div class="value">${formatNumber(stats.totalMessages)}</div>
+                    <div class="subtitle">Across all sessions</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Longest Session</div>
+                    <div class="value">${formatDuration(stats.longestSession.duration)}</div>
+                    <div class="subtitle">${stats.longestSession.messageCount} messages</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Total Tokens</div>
+                    <div class="value">${formatNumber(usage.inputTokens + usage.outputTokens)}</div>
+                    <div class="subtitle">Input + Output</div>
+                </div>
+            `;
+
+            // Activity Chart
+            const ctx = document.getElementById('activityChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: stats.dailyActivity.map(d => new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
+                    datasets: [{
+                        label: 'Messages',
+                        data: stats.dailyActivity.map(d => d.messageCount),
+                        borderColor: '#c9885a',
+                        backgroundColor: 'rgba(201, 136, 90, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'Tool Calls',
+                        data: stats.dailyActivity.map(d => d.toolCallCount),
+                        borderColor: '#3fb950',
+                        backgroundColor: 'rgba(63, 185, 80, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#8b949e' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e' }
+                        },
+                        y: {
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e' }
+                        }
+                    }
+                }
+            });
+
+            // Hour Chart
+            const hourChart = document.getElementById('hourChart');
+            const maxHour = Math.max(...Object.values(stats.hourCounts));
+            for (let h = 0; h < 24; h++) {
+                const count = stats.hourCounts[h] || 0;
+                const height = count > 0 ? (count / maxHour) * 100 : 4;
+                const bar = document.createElement('div');
+                bar.className = 'hour-bar';
+                bar.style.height = height + '%';
+                bar.title = `${h}:00 - ${count} sessions`;
+                hourChart.appendChild(bar);
+            }
+
+            // Token Usage
+            document.getElementById('tokenUsage').innerHTML = `
+                <p><span class="input">Input Tokens:</span> ${formatNumber(usage.inputTokens)}</p>
+                <p><span class="output">Output Tokens:</span> ${formatNumber(usage.outputTokens)}</p>
+                <p style="margin-top: 12px;"><span class="cache">Cache Read:</span> ${formatNumber(usage.cacheReadInputTokens)}</p>
+                <p><span class="cache">Cache Created:</span> ${formatNumber(usage.cacheCreationInputTokens)}</p>
+            `;
+        }
+
+        // Initialize Stats Page
+        function initStats() {
+            const stats = data.stats;
+            const usage = stats.modelUsage["claude-opus-4-5-20251101"];
+
+            const totalToolCalls = stats.dailyActivity.reduce((sum, d) => sum + d.toolCallCount, 0);
+            const avgMessagesPerSession = Math.round(stats.totalMessages / stats.totalSessions);
+
+            document.getElementById('detailed-stats').innerHTML = `
+                <div class="stat-card">
+                    <div class="label">Average Messages/Session</div>
+                    <div class="value">${avgMessagesPerSession}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Total Tool Calls</div>
+                    <div class="value">${formatNumber(totalToolCalls)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Cache Efficiency</div>
+                    <div class="value">${((usage.cacheReadInputTokens / (usage.cacheReadInputTokens + usage.inputTokens)) * 100).toFixed(1)}%</div>
+                    <div class="subtitle">Tokens from cache</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Model</div>
+                    <div class="value" style="font-size: 1rem;">claude-opus-4-5</div>
+                    <div class="subtitle">Primary model used</div>
+                </div>
+            `;
+
+            // Token Chart
+            const ctx = document.getElementById('tokenChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: stats.dailyModelTokens.map(d => new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
+                    datasets: [{
+                        label: 'Tokens',
+                        data: stats.dailyModelTokens.map(d => d.tokensByModel["claude-opus-4-5-20251101"]),
+                        backgroundColor: '#c9885a'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e' }
+                        },
+                        y: {
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize History
+        function initHistory() {
+            const tbody = document.getElementById('historyTable');
+            data.history.forEach(entry => {
+                const tr = document.createElement('tr');
+                const displayText = entry.display.length > 80 ? entry.display.substring(0, 80) + '...' : entry.display;
+                tr.innerHTML = `
+                    <td>${displayText}</td>
+                    <td><span class="badge badge-accent">${entry.project.split('/').pop()}</span></td>
+                    <td style="font-family: monospace; font-size: 0.75rem; color: var(--text-secondary);">${entry.sessionId.substring(0, 8)}...</td>
+                    <td style="color: var(--text-secondary);">${new Date(entry.timestamp).toLocaleString()}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Search functionality
+            document.getElementById('historySearch').addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                tbody.querySelectorAll('tr').forEach((tr, i) => {
+                    const visible = data.history[i].display.toLowerCase().includes(query) ||
+                                   data.history[i].project.toLowerCase().includes(query);
+                    tr.style.display = visible ? '' : 'none';
+                });
+            });
+        }
+
+        // Initialize Projects
+        function initProjects() {
+            const grid = document.getElementById('projectsGrid');
+            data.projects.forEach(project => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="card-title">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                        ${project.name}
+                    </div>
+                    <div class="card-meta">${project.path.replace(/-/g, '/')}</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // Initialize Plans
+        function initPlans() {
+            const grid = document.getElementById('plansGrid');
+            data.plans.forEach(plan => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="card-title">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        ${plan.name}
+                    </div>
+                    <div class="card-meta">${plan.size} • Modified ${plan.modified}</div>
+                `;
+                card.addEventListener('click', () => {
+                    if (plan.content) {
+                        showModal(plan.name, `<div class="markdown-content"><pre>${plan.content}</pre></div>`);
+                    } else {
+                        showModal(plan.name, `<p style="color: var(--text-secondary);">Plan content preview not available. Open ~/.claude/plans/${plan.file} to view.</p>`);
+                    }
+                });
+                grid.appendChild(card);
+            });
+        }
+
+        // Initialize Settings
+        function initSettings() {
+            document.getElementById('settingsJson').textContent = JSON.stringify(data.settings, null, 2);
+            document.getElementById('settingsLocalJson').textContent = JSON.stringify(data.settingsLocal, null, 2);
+        }
+
+        // Initialize Plugins
+        function initPlugins() {
+            const container = document.getElementById('pluginsContainer');
+            container.innerHTML = `
+                <div class="table-header">
+                    <h3>Installed Plugins</h3>
+                </div>
+                <div class="list-item">
+                    <div class="list-item-content">
+                        <h4>swift-lsp</h4>
+                        <p>Version 1.0.0 • Installed Jan 24, 2026</p>
+                    </div>
+                    <span class="badge badge-success">Enabled</span>
+                </div>
+                <div class="table-header" style="margin-top: 16px;">
+                    <h3>Marketplaces</h3>
+                </div>
+                <div class="list-item">
+                    <div class="list-item-content">
+                        <h4>claude-plugins-official</h4>
+                        <p>anthropics/claude-plugins-official • GitHub</p>
+                    </div>
+                    <span class="badge badge-accent">Active</span>
+                </div>
+            `;
+        }
+
+        // Initialize Skills
+        function initSkills() {
+            const grid = document.getElementById('skillsGrid');
+            data.skills.forEach(skill => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="card-title">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        ${skill.name}
+                    </div>
+                    <div class="card-meta">Files: ${skill.files.join(', ')}</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // Modal
+        function showModal(title, content) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalBody').innerHTML = content;
+            document.getElementById('modal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+        }
+
+        document.getElementById('modal').addEventListener('click', (e) => {
+            if (e.target.id === 'modal') closeModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        // Initialize all
+        initDashboard();
+        initStats();
+        initHistory();
+        initProjects();
+        initPlans();
+        initSettings();
+        initPlugins();
+        initSkills();
+    </script>
+</body>
+</html>
