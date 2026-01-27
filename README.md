@@ -21,8 +21,7 @@ An interactive dashboard for exploring your [Claude Code](https://claude.ai/code
 ### Using Homebrew (macOS/Linux)
 
 ```bash
-brew tap kaymo-ai/claude-explorer https://github.com/kaymo-ai/claude-explorer
-brew install claude-explorer
+brew install kaymo-ai/claude-explorer/claude-explorer
 ```
 
 ### Using pip
