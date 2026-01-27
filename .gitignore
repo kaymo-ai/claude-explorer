@@ -1,0 +1,5 @@
+# Local Claude data (regenerate with extract-claude-data.sh)
+claude-data.json
+
+# Claude session files
+.claude/
