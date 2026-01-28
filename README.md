@@ -39,12 +39,6 @@ Explore custom skills and their configurations.
 brew install kaymo-ai/claude-explorer/claude-explorer
 ```
 
-### Using pip
-
-```bash
-pip install claude-explorer
-```
-
 ### Manual Installation
 
 ```bash
