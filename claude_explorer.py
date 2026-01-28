@@ -674,6 +674,8 @@ def build_html(data, output_path, verbose=False):
     """Build the HTML file with embedded data."""
     template = get_html_template()
     data_json = json.dumps(data)
+    # Escape </script> to prevent breaking HTML parsing
+    data_json = data_json.replace('</script>', '<\\/script>')
     html = template.replace('%%DATA_PLACEHOLDER%%', data_json)
 
     output_path = Path(output_path)
