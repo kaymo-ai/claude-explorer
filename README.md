@@ -8,11 +8,26 @@ An interactive dashboard for exploring your [Claude Code](https://claude.ai/code
 
 ## Features
 
-- **Dashboard** - Overview of usage statistics, activity charts, and token consumption
-- **Session Explorer** - Browse and read full conversation history from all your projects
+### Dashboard
+Overview of usage statistics, activity charts, and token consumption.
+
+![Dashboard](img/dashboard.png)
+
+### Session Explorer
+Browse and read full conversation history from all your projects.
+
+![Projects](img/projects.png)
+
+### Skills Browser
+Explore custom skills and their configurations.
+
+![Skills](img/skills.png)
+
+![Skill Detail](img/skill.png)
+
+### Other Features
 - **History Search** - Search and filter through your command history
 - **Plans Viewer** - View saved implementation plans with Markdown rendering
-- **Skills Browser** - Explore custom skills and their configurations
 - **Settings Inspector** - View your Claude Code configuration
 - **Plugins Overview** - See installed plugins and marketplaces
 
