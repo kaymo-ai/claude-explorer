@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claude-explorer"
-version = "1.0.0"
+version = "1.1.0"
 description = "Interactive viewer for Claude Code session data"
 readme = "README.md"
 license = {text = "MIT"}

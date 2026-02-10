@@ -88,6 +88,7 @@ Options:
   --max-sessions N        Maximum sessions per project (default: 20)
   --max-messages N        Maximum messages per session (default: 500)
   -v, --verbose           Show detailed progress
+  --merge HTML_FILE [..]  Merge data from other claude-explorer.html files
   --json                  Output raw JSON data instead of HTML
   -h, --help              Show this help message
 ```
@@ -112,6 +113,12 @@ claude-explorer --json > claude-data.json
 
 # Use a different Claude directory
 claude-explorer -d /path/to/other/.claude
+
+# Merge data from other explorer HTML files
+claude-explorer --merge ~/old-explorer.html
+
+# Merge multiple files into one dashboard
+claude-explorer --merge ~/backup1.html ~/backup2.html -o ~/merged.html
 ```
 
 ## What Data is Included?

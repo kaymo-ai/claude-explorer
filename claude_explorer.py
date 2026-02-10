@@ -9,13 +9,14 @@ to explore your Claude Code session history, settings, plans, and more.
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 def get_default_claude_dir():
     """Get the default Claude directory based on platform."""
@@ -86,6 +87,121 @@ def parse_session(path, max_messages=500, max_content_length=5000):
         if len(messages) >= max_messages:
             break
     return messages
+
+def extract_data_from_html(path):
+    """Extract the embedded JSON data from a claude-explorer HTML file."""
+    text = Path(path).read_text()
+    # Reverse the </script> escaping applied during build_html
+    text = text.replace('<\\/script>', '</script>')
+    m = re.search(r'const data = ({.*?});\s*\n\s*let currentView', text, re.DOTALL)
+    if not m:
+        raise ValueError(f"Could not extract data from {path}")
+    return json.loads(m.group(1))
+
+
+def merge_data(base, other):
+    """Merge data from *other* into *base* (mutates base). Returns base."""
+    # --- stats ---
+    bs = base.setdefault('stats', {})
+    os_ = other.get('stats', {})
+
+    for key in ('totalSessions', 'totalMessages'):
+        bs[key] = bs.get(key, 0) + os_.get(key, 0)
+
+    # firstSessionDate — keep earliest
+    for d in (bs.get('firstSessionDate'), os_.get('firstSessionDate')):
+        if d:
+            if not bs.get('firstSessionDate') or d < bs['firstSessionDate']:
+                bs['firstSessionDate'] = d
+
+    # longestSession — keep the one with the larger duration
+    ol = os_.get('longestSession')
+    if ol:
+        bl = bs.get('longestSession')
+        if not bl or (ol.get('duration', 0) > bl.get('duration', 0)):
+            bs['longestSession'] = ol
+
+    # modelUsage — merge by model name, sum token fields
+    bm = bs.setdefault('modelUsage', {})
+    for model, vals in os_.get('modelUsage', {}).items():
+        if model not in bm:
+            bm[model] = dict(vals)
+        else:
+            for field in ('inputTokens', 'outputTokens',
+                          'cacheReadInputTokens', 'cacheCreationInputTokens'):
+                bm[model][field] = bm[model].get(field, 0) + vals.get(field, 0)
+
+    # dailyActivity — merge by date, sum counts
+    bd_map = {d['date']: d for d in bs.get('dailyActivity', [])}
+    for d in os_.get('dailyActivity', []):
+        if d['date'] in bd_map:
+            for field in ('messageCount', 'sessionCount', 'toolCallCount'):
+                bd_map[d['date']][field] = bd_map[d['date']].get(field, 0) + d.get(field, 0)
+        else:
+            bd_map[d['date']] = dict(d)
+    bs['dailyActivity'] = sorted(bd_map.values(), key=lambda x: x['date'])
+
+    # hourCounts — sum per hour key
+    bh = bs.setdefault('hourCounts', {})
+    for hour, count in os_.get('hourCounts', {}).items():
+        bh[hour] = bh.get(hour, 0) + count
+
+    # --- list merges with deduplication ---
+
+    # history — deduplicate by (timestamp, sessionId)
+    seen_hist = {(h.get('timestamp'), h.get('sessionId')) for h in base.get('history', [])}
+    for h in other.get('history', []):
+        key = (h.get('timestamp'), h.get('sessionId'))
+        if key not in seen_hist:
+            base.setdefault('history', []).append(h)
+            seen_hist.add(key)
+
+    # projects — merge by path; combine sessions deduplicated by id
+    bp_map = {p['path']: p for p in base.get('projects', [])}
+    for p in other.get('projects', []):
+        if p['path'] in bp_map:
+            existing_ids = {s['id'] for s in bp_map[p['path']]['sessions']}
+            for s in p.get('sessions', []):
+                if s['id'] not in existing_ids:
+                    bp_map[p['path']]['sessions'].append(s)
+                    existing_ids.add(s['id'])
+            bp_map[p['path']]['sessionCount'] = len(bp_map[p['path']]['sessions'])
+        else:
+            bp_map[p['path']] = dict(p)
+    base['projects'] = list(bp_map.values())
+
+    # plans — deduplicate by name
+    seen = {p['name'] for p in base.get('plans', [])}
+    for p in other.get('plans', []):
+        if p['name'] not in seen:
+            base.setdefault('plans', []).append(p)
+            seen.add(p['name'])
+
+    # skills — deduplicate by name
+    seen = {s['name'] for s in base.get('skills', [])}
+    for s in other.get('skills', []):
+        if s['name'] not in seen:
+            base.setdefault('skills', []).append(s)
+            seen.add(s['name'])
+
+    # todos — deduplicate by id
+    seen = {t['id'] for t in base.get('todos', [])}
+    for t in other.get('todos', []):
+        if t['id'] not in seen:
+            base.setdefault('todos', []).append(t)
+            seen.add(t['id'])
+
+    # fileHistory — deduplicate by sessionId
+    seen = {f['sessionId'] for f in base.get('fileHistory', [])}
+    for f in other.get('fileHistory', []):
+        if f['sessionId'] not in seen:
+            base.setdefault('fileHistory', []).append(f)
+            seen.add(f['sessionId'])
+
+    # settings, settingsLocal, installedPlugins, marketplaces — keep base (local)
+
+    return base
+
 
 def extract_data(claude_dir, max_sessions=20, max_messages=500, verbose=False):
     """Extract all data from the Claude directory."""
@@ -295,11 +411,17 @@ def get_html_template():
         .chart-wrapper { height: 250px; }
         .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
-        .hour-chart { display: flex; gap: 3px; align-items: flex-end; height: 80px; }
-        .hour-bar { flex: 1; background: var(--accent); border-radius: 2px 2px 0 0; min-height: 3px; }
-        .token-stat { margin: 6px 0; }
-        .token-stat .label { font-size: 0.8rem; color: var(--text-secondary); }
-        .token-stat .value { font-size: 1.1rem; font-weight: 500; }
+        .hour-chart { display: flex; gap: 3px; align-items: flex-end; height: 150px; padding-bottom: 20px; position: relative; }
+        .hour-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+        .hour-bar { width: 100%; background: var(--accent); border-radius: 2px 2px 0 0; min-height: 3px; }
+        .hour-label { font-size: 0.6rem; color: var(--text-secondary); margin-top: 3px; }
+        .token-card { cursor: default; }
+        .token-card:hover { transform: none; }
+        .token-card .card-title { margin-bottom: 12px; }
+        .token-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; }
+        .token-stat { }
+        .token-stat .label { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 2px; }
+        .token-stat .value { font-size: 1.05rem; font-weight: 500; }
         .token-stat.input .value { color: var(--info); }
         .token-stat.output .value { color: var(--success); }
         .token-stat.cache .value { color: var(--text-secondary); }
@@ -382,7 +504,7 @@ let currentProject = null;
 let currentSession = null;
 
 const fmt = {
-    num: n => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : n.toString(),
+    num: n => Number(n).toLocaleString(),
     bytes: b => b >= 1048576 ? (b/1048576).toFixed(1)+' MB' : b >= 1024 ? (b/1024).toFixed(1)+' KB' : b+' B',
     duration: ms => Math.floor(ms/3600000)+'h '+Math.floor((ms%3600000)/60000)+'m',
     date: ts => ts ? new Date(ts).toLocaleString() : '',
@@ -467,30 +589,65 @@ function render() {
 }
 
 function renderDashboard(header, content) {
-    const s = data.stats || {}, u = Object.values(s.modelUsage || {})[0] || {};
-    header.innerHTML = '<h2>Dashboard</h2><p>Claude Code usage overview</p>';
+    const s = data.stats || {};
+    const models = s.modelUsage || {};
+    const modelNames = Object.keys(models);
+    const totalInput = modelNames.reduce((a,m) => a + (models[m].inputTokens||0), 0);
+    const totalOutput = modelNames.reduce((a,m) => a + (models[m].outputTokens||0), 0);
+    const totalCacheRead = modelNames.reduce((a,m) => a + (models[m].cacheReadInputTokens||0), 0);
+    const totalCacheCreate = modelNames.reduce((a,m) => a + (models[m].cacheCreationInputTokens||0), 0);
+    const daily = s.dailyActivity || [];
+    const totalToolCalls = daily.reduce((a,d) => a + (d.toolCallCount||0), 0);
+    const thirtyDaysAgo = new Date(Date.now() - 30*86400000).toISOString().slice(0,10);
+    const activeDaysLast30 = daily.filter(d => d.date >= thirtyDaysAgo).length;
+    const activeDays = daily.length;
+    const avgMsgsPerDay = activeDays ? Math.round((s.totalMessages||0) / activeDays) : 0;
+    const fmtModel = m => m.replace('claude-','').replace(/-\\d{8}$/,'');
+    const rs = data.runSettings || {};
+    const mergeInfo = rs.mergedFiles && rs.mergedFiles.length ? ' &middot; Merged: '+rs.mergedFiles.length+' file'+(rs.mergedFiles.length>1?'s':'') : '';
+    header.innerHTML = '<h2>Dashboard</h2><p>Claude Code usage overview</p>'
+        + (data.generatedAt ? '<p style="font-size:0.8rem;color:var(--text-secondary)">Generated: '+fmt.date(new Date(data.generatedAt).getTime())
+        + ' &middot; Max sessions/project: '+fmt.num(rs.maxSessions||0)
+        + ' &middot; Max messages/session: '+fmt.num(rs.maxMessages||0)
+        + ' &middot; Source: '+(rs.claudeDir||'~/.claude')
+        + mergeInfo+'</p>' : '');
     content.innerHTML = `
         <div class="stats-grid">
-            <div class="stat-card"><div class="label">Sessions</div><div class="value">${s.totalSessions||0}</div><div class="subtitle">Since ${s.firstSessionDate?fmt.shortDate(s.firstSessionDate):'N/A'}</div></div>
-            <div class="stat-card"><div class="label">Messages</div><div class="value">${fmt.num(s.totalMessages||0)}</div></div>
-            <div class="stat-card"><div class="label">Longest</div><div class="value">${s.longestSession?fmt.duration(s.longestSession.duration):'N/A'}</div><div class="subtitle">${s.longestSession?.messageCount||0} msgs</div></div>
-            <div class="stat-card"><div class="label">Projects</div><div class="value">${data.projects?.length||0}</div></div>
+            <div class="stat-card"><div class="label">Total Sessions</div><div class="value">${fmt.num(s.totalSessions||0)}</div><div class="subtitle">Since ${s.firstSessionDate?fmt.date(s.firstSessionDate):'N/A'}</div></div>
+            <div class="stat-card"><div class="label">Total Messages</div><div class="value">${fmt.num(s.totalMessages||0)}</div><div class="subtitle">${fmt.num(avgMsgsPerDay)} avg per active day</div></div>
+            <div class="stat-card"><div class="label">Active Days Last Month</div><div class="value">${fmt.num(activeDaysLast30)}</div><div class="subtitle">${fmt.num(activeDays)} total all time</div></div>
+            <div class="stat-card"><div class="label">Tool Calls</div><div class="value">${fmt.num(totalToolCalls)}</div></div>
+            <div class="stat-card"><div class="label">Longest Session</div><div class="value">${s.longestSession?fmt.duration(s.longestSession.duration):'N/A'}</div><div class="subtitle">${fmt.num(s.longestSession?.messageCount||0)} messages</div></div>
+            <div class="stat-card"><div class="label">Projects</div><div class="value">${fmt.num(data.projects?.length||0)}</div><div class="subtitle">${fmt.num(data.history?.length||0)} history entries</div></div>
         </div>
-        <div class="chart-container"><h3>Activity</h3><div class="chart-wrapper"><canvas id="activityChart"></canvas></div></div>
-        <div class="two-col">
-            <div class="chart-container"><h3>By Hour</h3><div class="hour-chart" id="hourChart"></div></div>
-            <div class="chart-container"><h3>Tokens</h3>
-                <div class="token-stat input"><div class="label">Input</div><div class="value">${fmt.num(u.inputTokens||0)}</div></div>
-                <div class="token-stat output"><div class="label">Output</div><div class="value">${fmt.num(u.outputTokens||0)}</div></div>
-                <div class="token-stat cache"><div class="label">Cache</div><div class="value">${fmt.num(u.cacheReadInputTokens||0)}</div></div>
+        <div class="card-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom: 16px">
+            <div class="card token-card">
+                <div class="card-title">All Models</div>
+                <div class="token-grid">
+                    <div class="token-stat input"><div class="label">Input</div><div class="value">${fmt.num(totalInput)}</div></div>
+                    <div class="token-stat output"><div class="label">Output</div><div class="value">${fmt.num(totalOutput)}</div></div>
+                    <div class="token-stat cache"><div class="label">Cache Read</div><div class="value">${fmt.num(totalCacheRead)}</div></div>
+                    <div class="token-stat cache"><div class="label">Cache Created</div><div class="value">${fmt.num(totalCacheCreate)}</div></div>
+                </div>
             </div>
+            ${modelNames.map(m => `<div class="card token-card">
+                <div class="card-title">${fmtModel(m)}</div>
+                <div class="token-grid">
+                    <div class="token-stat input"><div class="label">Input</div><div class="value">${fmt.num(models[m].inputTokens||0)}</div></div>
+                    <div class="token-stat output"><div class="label">Output</div><div class="value">${fmt.num(models[m].outputTokens||0)}</div></div>
+                    <div class="token-stat cache"><div class="label">Cache Read</div><div class="value">${fmt.num(models[m].cacheReadInputTokens||0)}</div></div>
+                    <div class="token-stat cache"><div class="label">Cache Created</div><div class="value">${fmt.num(models[m].cacheCreationInputTokens||0)}</div></div>
+                </div>
+            </div>`).join('')}
         </div>
+        <div class="chart-container"><h3>Daily Activity</h3><div class="chart-wrapper"><canvas id="activityChart"></canvas></div></div>
+        <div class="chart-container"><h3>Activity by Hour (Last 7 Days)</h3><div id="hourCharts"></div></div>
     `;
     initCharts();
 }
 
 function renderHistory(header, content) {
-    const h = data.history || [];
+    const h = data._historyReversed = [...(data.history || [])].reverse();
     const projs = [...new Set(h.map(x=>x.project?.split('/').pop()).filter(Boolean))];
     header.innerHTML = `<h2>History</h2><p>${h.length} entries</p>`;
     content.innerHTML = `
@@ -620,15 +777,55 @@ function initCharts() {
             type: 'line',
             data: {
                 labels: s.dailyActivity.map(d => new Date(d.date).toLocaleDateString('en-US', {month:'short',day:'numeric'})),
-                datasets: [{label:'Messages',data:s.dailyActivity.map(d=>d.messageCount),borderColor:'#c9885a',backgroundColor:'rgba(201,136,90,0.1)',fill:true,tension:0.4},{label:'Tools',data:s.dailyActivity.map(d=>d.toolCallCount),borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.1)',fill:true,tension:0.4}]
+                datasets: [{label:'Messages',data:s.dailyActivity.map(d=>d.messageCount),borderColor:'#c9885a',backgroundColor:'rgba(201,136,90,0.1)',fill:true,tension:0.4},{label:'Tool Calls',data:s.dailyActivity.map(d=>d.toolCallCount),borderColor:'#79c0ff',backgroundColor:'rgba(121,192,255,0.1)',fill:true,tension:0.4}]
             },
             options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8b949e'}}},scales:{x:{grid:{color:'#30363d'},ticks:{color:'#8b949e'}},y:{grid:{color:'#30363d'},ticks:{color:'#8b949e'}}}}
         });
     }
-    const hc = document.getElementById('hourChart');
-    if (hc && s.hourCounts) {
-        const max = Math.max(...Object.values(s.hourCounts), 1);
-        for (let h=0;h<24;h++) { const bar=document.createElement('div'); bar.className='hour-bar'; bar.style.height=((s.hourCounts[h]||0)/max*100||3)+'%'; bar.title=h+':00'; hc.appendChild(bar); }
+    const hcContainer = document.getElementById('hourCharts');
+    if (hcContainer) {
+        const hist = data.history || [];
+        const now = Date.now();
+        const dayMs = 86400000;
+        const days = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(now - i * dayMs);
+            days.push({ label: d.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'}), dateStr: d.toISOString().slice(0,10), hours: new Array(24).fill(0) });
+        }
+        hist.forEach(h => {
+            if (!h.timestamp) return;
+            const d = new Date(h.timestamp);
+            const ds = d.toISOString().slice(0,10);
+            const day = days.find(x => x.dateStr === ds);
+            if (day) day.hours[d.getHours()]++;
+        });
+        const globalMax = Math.max(...days.flatMap(d => d.hours), 1);
+        days.forEach(day => {
+            const hasActivity = day.hours.some(v => v > 0);
+            const row = document.createElement('div');
+            row.style.cssText = 'margin-bottom:24px';
+            const label = document.createElement('div');
+            label.style.cssText = 'font-size:0.75rem;color:var(--text-secondary);margin-bottom:6px';
+            label.textContent = day.label;
+            row.appendChild(label);
+            const chart = document.createElement('div');
+            chart.className = 'hour-chart';
+            chart.style.cssText = 'opacity:' + (hasActivity ? '1' : '0.4');
+            for (let h = 0; h < 24; h++) {
+                const col = document.createElement('div'); col.className = 'hour-col';
+                const bar = document.createElement('div'); bar.className = 'hour-bar';
+                const pct = day.hours[h] / globalMax;
+                bar.style.height = (pct * 100 || 2) + '%';
+                bar.style.background = pct > 0.7 ? '#c9885a' : pct > 0.3 ? '#79c0ff' : 'var(--accent-dim, #4a6a8a)';
+                bar.title = day.hours[h] + ' messages at ' + h + ':00';
+                col.appendChild(bar);
+                if (h % 6 === 0) { const lbl = document.createElement('div'); lbl.className = 'hour-label'; lbl.textContent = h + ':00'; col.appendChild(lbl); }
+                else { const sp = document.createElement('div'); sp.className = 'hour-label'; sp.innerHTML = '\\u00a0'; col.appendChild(sp); }
+                chart.appendChild(col);
+            }
+            row.appendChild(chart);
+            hcContainer.appendChild(row);
+        });
     }
 }
 
@@ -652,7 +849,7 @@ document.getElementById('modal').addEventListener('click', e => { if(e.target.id
 document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
 
 function showHistoryDetail(i) {
-    const h = data.history[i];
+    const h = data._historyReversed[i];
     showModal('Message', `<div class="detail-body"><div class="code-block">${fmt.escape(h.display||'')}</div><div style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary)"><div>Project: ${h.project||'N/A'}</div><div>Session: ${h.sessionId||'N/A'}</div><div>Time: ${h.timestamp?fmt.date(h.timestamp):'N/A'}</div></div></div>`);
 }
 function showPlanDetail(i) {
@@ -672,6 +869,7 @@ render();
 
 def build_html(data, output_path, verbose=False):
     """Build the HTML file with embedded data."""
+    data['generatedAt'] = datetime.now().isoformat()
     template = get_html_template()
     data_json = json.dumps(data)
     # Escape </script> to prevent breaking HTML parsing
@@ -690,14 +888,17 @@ def build_html(data, output_path, verbose=False):
     return output_path
 
 def open_in_browser(path):
-    """Open the HTML file in the default browser."""
+    """Open the HTML file in the default browser, forcing a fresh load."""
     path = Path(path).resolve()
+    # Append a unique query string so the browser treats each run as a new URL
+    # instead of just focusing an already-open tab with stale content.
+    url = f"file://{path}?v={int(os.path.getmtime(path))}"
     if sys.platform == 'darwin':
-        subprocess.run(['open', str(path)])
+        subprocess.run(['open', url])
     elif sys.platform == 'win32':
-        os.startfile(str(path))
+        os.startfile(url)
     else:
-        subprocess.run(['xdg-open', str(path)])
+        subprocess.run(['xdg-open', url])
 
 def main():
     parser = argparse.ArgumentParser(
@@ -738,15 +939,15 @@ Examples:
     parser.add_argument(
         '--max-sessions',
         type=int,
-        default=20,
-        help='Maximum sessions per project (default: 20)'
+        default=100,
+        help='Maximum sessions per project (default: 100)'
     )
 
     parser.add_argument(
         '--max-messages',
         type=int,
-        default=500,
-        help='Maximum messages per session (default: 500)'
+        default=2000,
+        help='Maximum messages per session (default: 2000)'
     )
 
     parser.add_argument(
@@ -759,6 +960,14 @@ Examples:
         '--json',
         action='store_true',
         help='Output raw JSON data instead of HTML'
+    )
+
+    parser.add_argument(
+        '--merge',
+        type=Path,
+        nargs='+',
+        metavar='HTML_FILE',
+        help='Merge data from other claude-explorer.html files'
     )
 
     args = parser.parse_args()
@@ -774,6 +983,29 @@ Examples:
         max_messages=args.max_messages,
         verbose=args.verbose
     )
+
+    # Merge data from other HTML files
+    merged_files = []
+    if args.merge:
+        for merge_path in args.merge:
+            if not merge_path.exists():
+                print(f"Warning: merge file not found: {merge_path}", file=sys.stderr)
+                continue
+            try:
+                other = extract_data_from_html(merge_path)
+                merge_data(data, other)
+                merged_files.append(str(merge_path))
+                if args.verbose:
+                    print(f"  Merged: {merge_path}")
+            except Exception as e:
+                print(f"Warning: could not merge {merge_path}: {e}", file=sys.stderr)
+
+    data['runSettings'] = {
+        'maxSessions': args.max_sessions,
+        'maxMessages': args.max_messages,
+        'claudeDir': str(args.claude_dir),
+        'mergedFiles': merged_files,
+    }
 
     # Output JSON if requested
     if args.json:

@@ -10,7 +10,7 @@ long_description = readme.read_text() if readme.exists() else ""
 
 setup(
     name="claude-explorer",
-    version="1.0.0",
+    version="1.1.0",
     author="Marcus Foster",
     author_email="marcus@kaymo.ai",
     description="Interactive viewer for Claude Code session data",
