@@ -14,7 +14,7 @@ class ClaudeExplorer < Formula
   depends_on "python@3.11"
 
   def install
-    bin.install "claude-explorer"
+    bin.install "claude_explorer.py" => "claude-explorer"
   end
 
   test do
